@@ -15,6 +15,8 @@ access_token = config['TELEGRAM']['ACCESS_TOKEN']
 webhook_url = config['TELEGRAM']['WEBHOOK_URL']
 requests.post('https://api.telegram.org/bot'+access_token+'/deleteWebhook').text
 requests.post('https://api.telegram.org/bot'+access_token+'/setWebhook?url='+webhook_url+'/hook').text
+df = pd.read_csv(r'C:\Users\wells\0319_ntu_scu\fugle_telegram_chatbot\symbol_info.csv',encoding='utf8')
+
 # Initial Flask app
 app = Flask(__name__)
 
@@ -37,23 +39,45 @@ def reply_handler(bot, update):
     global s
     global api
     global stock
+    global df
     text = update.message.text
     if text == '/start':
-        update.message.reply_text('enter the store number which u want to search')
+        update.message.reply_text('do u want /search stock symbolId or check stock /data?')
         s = 1
     elif 'restart' in text and s == 1:
         stock = None
-        update.message.reply_text('enter the store number which u want to search')
+        update.message.reply_text('do u want /search stock symbolId or check stock /data?')
     elif s == 0:
         update.message.reply_text('please enter \'/start\' to start fintech')
     else:
         if stock is None:
-            meta = intraday.meta(apiToken=api,symbolId=text,output='raw')
-            try:
-                update.message.reply_text(meta['error']['message'])
-            except:
-                stock = text
-                update.message.reply_text('What do u want to search with ' + meta['nameZhTw']+'\nu can enter:\n/priceReference\n/priceOpen\n/priceNow\n/bestBidsandAsks\n/graph\n/restart')
+            if 'search' in text:
+                s = 2
+                update.message.reply_text('enter the company name')
+            elif s == 2:
+                df1 = df[df['name'].isin([text])].reset_index(drop = True)
+                try:
+                    name = df1['symbol_id'][0]
+                    update.message.reply_text(name)
+                    s = 1
+                except:
+                    update.message.reply_text('no this company')
+                    s = 1
+            elif 'data' in text:
+                s = 3
+                update.message.reply_text('enter the company symbolId')
+            elif s == 3:
+                meta = intraday.meta(apiToken=api,symbolId=text,output='raw')
+                try:
+                    e = meta['error']['message']
+                    update.message.reply_text(meta['error']['message'])
+                    s = 1
+                except:
+                    stock = text
+                    update.message.reply_text('What do u want to search with ' + meta['nameZhTw']+'\nu can enter:\n/priceReference\n/priceOpen\n/priceNow\n/bestBidsandAsks\n/graph\n/restart')
+                    s = 1
+            else:
+                update.message.reply_text('I don\'t know what u want')
         elif 'priceReference' in text:
             meta = intraday.meta(apiToken=api,symbolId=stock,output='raw')
             priceReference = str(meta['priceReference'])
